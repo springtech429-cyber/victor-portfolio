@@ -1,4 +1,4 @@
-
+"use client" ;
 import { motion } from 'framer-motion';
 import { ArrowRight, Download, MapPin } from 'lucide-react';
 import { useSiteData } from '../context/DataContext';

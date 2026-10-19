@@ -1,3 +1,4 @@
+"use client" ;
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { api } from '../lib/api';
 import { DEFAULT_PROFILE } from '../lib/defaults';

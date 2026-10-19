@@ -1,4 +1,4 @@
-
+"use client" ;
 import { useTheme } from '../context/ThemeContext';
 import { useSiteData } from '../context/DataContext';
 import { splitName } from '../lib/helpers';
