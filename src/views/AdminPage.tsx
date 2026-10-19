@@ -3,7 +3,7 @@ import { CheckCircle, AlertCircle, ExternalLink, Info, LogOut, Save } from 'luci
 import { api } from '../lib/api';
 import { useSiteData } from '../context/DataContext';
 import { AdminLogin } from '../components/admin/AdminLogin';
-import { ProjectsManager } from '../components/admin/ProjectsManager';
+import { EntriesManager } from '../components/admin/EntriesManager';
 import { ProfileEditor } from '../components/admin/ProfileEditor';
 import { SkillsEditor } from '../components/admin/SkillsEditor';
 import { MessagesInbox } from '../components/admin/MessagesInbox';
@@ -11,9 +11,9 @@ import { btnGhost, btnPrimary, type Notify } from '../components/admin/ui';
 import { normalizeUrl, safeUrl } from '../lib/helpers';
 import type { Profile } from '../lib/types';
 
-type Tab = 'projects' | 'profile' | 'skills' | 'messages';
+type Tab = 'entries' | 'profile' | 'skills' | 'messages';
 const TABS: { id: Tab; label: string }[] = [
-  { id: 'projects', label: 'Projects' },
+  { id: 'entries', label: 'Content' },
   { id: 'profile', label: 'Profile & about' },
   { id: 'skills', label: 'Skills' },
   { id: 'messages', label: 'Messages' },
@@ -23,13 +23,13 @@ function cleanProfile(p: Profile): { profile?: Profile; error?: string } {
   const links = p.links.filter((l) => l.url.trim());
   const bad = links.find((l) => !safeUrl(l.url));
   if (bad) return { error: `The link "${bad.label || bad.url || 'untitled'}" needs a valid web address.` };
-  if (p.cvUrl.trim() && !safeUrl(p.cvUrl)) return { error: 'The CV link needs a valid web address.' };
+  if (p.resumeUrl.trim() && !safeUrl(p.resumeUrl)) return { error: 'The resume link needs a valid web address.' };
   return {
     profile: {
       ...p,
       name: p.name.trim() || 'Your name',
       links: links.map((l) => ({ label: l.label.trim(), url: normalizeUrl(l.url) })),
-      cvUrl: p.cvUrl.trim() ? normalizeUrl(p.cvUrl) : '',
+      resumeUrl: p.resumeUrl.trim() ? normalizeUrl(p.resumeUrl) : '',
       highlights: p.highlights.filter((h) => h.value.trim() || h.label.trim()),
       skillGroups: p.skillGroups
         .map((g) => ({ ...g, skills: g.skills.map((s) => s.trim()).filter(Boolean) }))
@@ -40,15 +40,15 @@ function cleanProfile(p: Profile): { profile?: Profile; error?: string } {
 
 export function AdminPage() {
   const { isAdmin, authChecked, profile, loading, reload, mode } = useSiteData();
-  const [tab, setTab] = useState<Tab>('projects');
+  const [tab, setTab] = useState<Tab>('entries');
   const [draft, setDraft] = useState<Profile>(profile);
   const [saving, setSaving] = useState(false);
   const [unread, setUnread] = useState(0);
   const [toast, setToast] = useState<{ message: string; kind: 'ok' | 'error' } | null>(null);
-  const timer = useRef<number>();
+  const timer = useRef<number | undefined>(undefined);
   const seeded = useRef(false);
 
-  // Fill the editor once the saved profile has loaded; later reloads (e.g. after adding a project) must not wipe edits.
+  // Fill the editor once the saved profile has loaded; later reloads (e.g. after adding an entry) must not wipe edits.
   useEffect(() => {
     if (!loading && !seeded.current) {
       setDraft(profile);
@@ -126,7 +126,7 @@ export function AdminPage() {
             <p>Demo mode: Supabase is not connected, so changes stay in this browser only. See the README to go live.</p>
           </div>
         )}
-        {tab === 'projects' && <ProjectsManager notify={notify} onChanged={reload} />}
+       {tab === 'entries' && <EntriesManager notify={notify} />}
         {tab === 'profile' && <ProfileEditor draft={draft} setDraft={setDraft} notify={notify} />}
         {tab === 'skills' && <SkillsEditor draft={draft} setDraft={setDraft} />}
         {tab === 'messages' && <MessagesInbox notify={notify} onUnreadChange={setUnread} />}

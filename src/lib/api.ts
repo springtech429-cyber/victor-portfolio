@@ -2,16 +2,16 @@ import { supabase, isSupabaseConfigured } from './supabase';
 import { DEFAULT_PROFILE, mergeProfile } from './defaults';
 import { blobToDataUrl, compressImage, extensionFor } from './images';
 import { uid } from './helpers';
-import type { Message, Profile, Project } from './types';
+import type { Entry, EntryType, LinkItem, Message, Profile } from './types';
 
 export interface Api {
   mode: 'supabase' | 'local';
   getProfile(): Promise<Profile>;
   saveProfile(p: Profile): Promise<void>;
-  listProjects(opts?: { includeDrafts?: boolean }): Promise<Project[]>;
-  saveProject(p: Project): Promise<void>;
-  deleteProject(p: Project): Promise<void>;
-  reorderProjects(ids: string[]): Promise<void>;
+  listEntries(opts?: { includeDrafts?: boolean }): Promise<Entry[]>;
+  saveEntry(e: Entry): Promise<void>;
+  deleteEntry(e: Entry): Promise<void>;
+  reorderEntries(ids: string[]): Promise<void>;
   submitMessage(m: { name: string; email: string; message: string }): Promise<void>;
   listMessages(): Promise<Message[]>;
   setMessageRead(id: string, read: boolean): Promise<void>;
@@ -27,60 +27,66 @@ const BUCKET = 'portfolio';
 
 /* ───────────────────────────── Supabase backend ───────────────────────────── */
 
-interface ProjectRow {
+interface EntryRow {
   id: string;
+  type: EntryType;
+  slug: string | null;
   title: string;
-  summary: string;
-  description: string;
-  category: string;
-  status: string;
-  client: string;
-  year: string;
+  summary: string | null;
+  body: string | null;
+  category: string | null;
   tags: string[] | null;
-  cover_image: string;
+  cover_image: string | null;
   gallery: string[] | null;
-  links: { label: string; url: string }[] | null;
+  links: LinkItem[] | null;
+  date: string | null;
   featured: boolean;
   published: boolean;
   sort_order: number;
+  meta: Record<string, string> | null;
+  file_url: string | null;
   created_at: string;
 }
 
-const fromRow = (r: ProjectRow): Project => ({
+const fromRow = (r: EntryRow): Entry => ({
   id: r.id,
+  type: r.type,
+  slug: r.slug ?? '',
   title: r.title,
   summary: r.summary ?? '',
-  description: r.description ?? '',
+  body: r.body ?? '',
   category: r.category ?? '',
-  status: r.status ?? '',
-  client: r.client ?? '',
-  year: r.year ?? '',
   tags: r.tags ?? [],
   coverImage: r.cover_image ?? '',
   gallery: r.gallery ?? [],
   links: r.links ?? [],
+  date: r.date ?? '',
   featured: r.featured,
   published: r.published,
   sortOrder: r.sort_order,
+  meta: r.meta ?? {},
+  fileUrl: r.file_url ?? '',
   createdAt: r.created_at,
 });
 
-const toRow = (p: Project) => ({
-  id: p.id,
-  title: p.title,
-  summary: p.summary,
-  description: p.description,
-  category: p.category,
-  status: p.status,
-  client: p.client,
-  year: p.year,
-  tags: p.tags,
-  cover_image: p.coverImage,
-  gallery: p.gallery,
-  links: p.links,
-  featured: p.featured,
-  published: p.published,
-  sort_order: p.sortOrder,
+const toRow = (e: Entry) => ({
+  id: e.id,
+  type: e.type,
+  slug: e.slug,
+  title: e.title,
+  summary: e.summary,
+  body: e.body,
+  category: e.category,
+  tags: e.tags,
+  cover_image: e.coverImage,
+  gallery: e.gallery,
+  links: e.links,
+  date: e.date,
+  featured: e.featured,
+  published: e.published,
+  sort_order: e.sortOrder,
+  meta: e.meta,
+  file_url: e.fileUrl,
   updated_at: new Date().toISOString(),
 });
 
@@ -112,34 +118,37 @@ const remote: Api = {
     if (error) throw new Error(error.message);
   },
 
-  async listProjects({ includeDrafts = false } = {}) {
+  async listEntries({ includeDrafts = false } = {}) {
     let q = db()
-      .from('projects')
+      .from('entries')
       .select('*')
       .order('sort_order', { ascending: true })
       .order('created_at', { ascending: false });
     if (!includeDrafts) q = q.eq('published', true);
     const { data, error } = await q;
     if (error) throw new Error(error.message);
-    return (data as ProjectRow[]).map(fromRow);
+    return (data as EntryRow[]).map(fromRow);
   },
 
-  async saveProject(p) {
-    const { error } = await db().from('projects').upsert(toRow(p));
+  async saveEntry(e) {
+    const { error } = await db().from('entries').upsert(toRow(e));
     if (error) throw new Error(error.message);
   },
 
-  async deleteProject(p) {
-    const { error } = await db().from('projects').delete().eq('id', p.id);
+  async deleteEntry(e) {
+    const { error } = await db().from('entries').delete().eq('id', e.id);
     if (error) throw new Error(error.message);
-    // Best effort: clean up uploaded pictures so storage doesn't fill with orphans.
-    const paths = [p.coverImage, ...p.gallery].map(bucketPath).filter((x): x is string => !!x);
+    // Best effort: clean up uploaded files so storage doesn't fill with orphans.
+    const paths = [e.coverImage, ...e.gallery, e.fileUrl]
+      .filter(Boolean)
+      .map(bucketPath)
+      .filter((x): x is string => !!x);
     if (paths.length) await db().storage.from(BUCKET).remove(paths);
   },
 
-  async reorderProjects(ids) {
+  async reorderEntries(ids) {
     const results = await Promise.all(
-      ids.map((id, i) => db().from('projects').update({ sort_order: i }).eq('id', id))
+      ids.map((id, i) => db().from('entries').update({ sort_order: i }).eq('id', id))
     );
     const failed = results.find((r) => r.error);
     if (failed?.error) throw new Error(failed.error.message);
@@ -227,7 +236,7 @@ const remote: Api = {
 
 const LS = {
   profile: 'portfolio:profile',
-  projects: 'portfolio:projects',
+  entries: 'portfolio:entries',
   messages: 'portfolio:messages',
   session: 'portfolio:demo-session',
 };
@@ -245,12 +254,12 @@ function lsSet(key: string, value: unknown) {
   try {
     localStorage.setItem(key, JSON.stringify(value));
   } catch {
-    throw new Error('This browser\'s storage is full. Remove some pictures, or connect Supabase.');
+    throw new Error("This browser's storage is full. Remove some pictures, or connect Supabase.");
   }
 }
 
 const authListeners = new Set<(v: boolean) => void>();
-const sortProjects = (list: Project[]) =>
+const sortEntries = (list: Entry[]) =>
   [...list].sort((a, b) => a.sortOrder - b.sortOrder || b.createdAt.localeCompare(a.createdAt));
 
 const local: Api = {
@@ -263,25 +272,25 @@ const local: Api = {
     lsSet(LS.profile, p);
   },
 
-  async listProjects({ includeDrafts = false } = {}) {
-    const all = lsGet<Project[]>(LS.projects, []);
-    return sortProjects(includeDrafts ? all : all.filter((p) => p.published));
+  async listEntries({ includeDrafts = false } = {}) {
+    const all = lsGet<Entry[]>(LS.entries, []);
+    return sortEntries(includeDrafts ? all : all.filter((e) => e.published));
   },
-  async saveProject(p) {
-    const all = lsGet<Project[]>(LS.projects, []);
-    const i = all.findIndex((x) => x.id === p.id);
-    if (i === -1) all.push({ ...p, createdAt: p.createdAt || new Date().toISOString() });
-    else all[i] = p;
-    lsSet(LS.projects, all);
+  async saveEntry(e) {
+    const all = lsGet<Entry[]>(LS.entries, []);
+    const i = all.findIndex((x) => x.id === e.id);
+    if (i === -1) all.push({ ...e, createdAt: e.createdAt || new Date().toISOString() });
+    else all[i] = e;
+    lsSet(LS.entries, all);
   },
-  async deleteProject(p) {
-    lsSet(LS.projects, lsGet<Project[]>(LS.projects, []).filter((x) => x.id !== p.id));
+  async deleteEntry(e) {
+    lsSet(LS.entries, lsGet<Entry[]>(LS.entries, []).filter((x) => x.id !== e.id));
   },
-  async reorderProjects(ids) {
-    const all = lsGet<Project[]>(LS.projects, []);
+  async reorderEntries(ids) {
+    const all = lsGet<Entry[]>(LS.entries, []);
     lsSet(
-      LS.projects,
-      all.map((p) => ({ ...p, sortOrder: ids.indexOf(p.id) === -1 ? p.sortOrder : ids.indexOf(p.id) }))
+      LS.entries,
+      all.map((e) => ({ ...e, sortOrder: ids.indexOf(e.id) === -1 ? e.sortOrder : ids.indexOf(e.id) }))
     );
   },
 

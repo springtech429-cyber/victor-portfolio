@@ -32,7 +32,7 @@ export function Nav({ name, resumeUrl }: { name: string; resumeUrl: string }) {
     return () => document.documentElement.classList.remove('lenis-stopped');
   }, [open]);
 
-  const active = (href: string) => pathname === href || pathname.startsWith(href + '/');
+  const active = (href: string) => pathname === href || pathname?.startsWith(href + '/');
 
   return (
     <header className={`fixed inset-x-0 top-0 z-50 transition-all duration-500 ${scrolled || open ? 'glass border-x-0 border-t-0' : 'border-b border-transparent'}`}>

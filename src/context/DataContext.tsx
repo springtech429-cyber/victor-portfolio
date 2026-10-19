@@ -1,12 +1,12 @@
-"use client" ;
+"use client";
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { api } from '../lib/api';
 import { DEFAULT_PROFILE } from '../lib/defaults';
-import type { Profile, Project } from '../lib/types';
+import type { Entry, Profile } from '../lib/types';
 
 interface DataContextType {
   profile: Profile;
-  projects: Project[];
+  entries: Entry[];
   loading: boolean;
   error: string | null;
   isAdmin: boolean;
@@ -19,7 +19,7 @@ const DataContext = createContext<DataContextType | undefined>(undefined);
 
 export function DataProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<Profile>(DEFAULT_PROFILE);
-  const [projects, setProjects] = useState<Project[]>([]);
+  const [entries, setEntries] = useState<Entry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -27,10 +27,10 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
 
   const reload = useCallback(async () => {
     setError(null);
-    const [p, pr] = await Promise.allSettled([api.getProfile(), api.listProjects()]);
+    const [p, en] = await Promise.allSettled([api.getProfile(), api.listEntries()]);
     if (p.status === 'fulfilled') setProfile(p.value);
-    if (pr.status === 'fulfilled') setProjects(pr.value);
-    const failure = [p, pr].find((r) => r.status === 'rejected') as PromiseRejectedResult | undefined;
+    if (en.status === 'fulfilled') setEntries(en.value);
+    const failure = [p, en].find((r) => r.status === 'rejected') as PromiseRejectedResult | undefined;
     if (failure) {
       setError(failure.reason instanceof Error ? failure.reason.message : 'Could not load content.');
     }
@@ -49,7 +49,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <DataContext.Provider
-      value={{ profile, projects, loading, error, isAdmin, authChecked, mode: api.mode, reload }}
+      value={{ profile, entries, loading, error, isAdmin, authChecked, mode: api.mode, reload }}
     >
       {children}
     </DataContext.Provider>

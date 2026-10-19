@@ -13,7 +13,7 @@ export function Hero({ setActiveSection }: HeroProps) {
   const { profile } = useSiteData();
   const { first, rest } = splitName(profile.name);
   const links = profile.links.filter((l) => safeUrl(l.url));
-  const cv = safeUrl(profile.cvUrl);
+  const cv = safeUrl(profile.resumeUrl);
 
   return (
     <div className="relative min-h-[calc(100vh-80px)] flex items-center justify-center overflow-hidden">

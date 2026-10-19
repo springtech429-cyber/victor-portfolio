@@ -1,8 +1,7 @@
-
+import { LandingPage } from './views/LandingPage';
+import { AdminPage } from './views/AdminPage';
 import { ThemeProvider } from './context/ThemeContext';
 import { DataProvider } from './context/DataContext';
-import { LandingPage } from './pages/LandingPage';
-import { AdminPage } from './pages/AdminPage';
 import { useHashRoute } from './lib/useHashRoute';
 
 export function App() {

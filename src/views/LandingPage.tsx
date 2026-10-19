@@ -1,8 +1,7 @@
-
 import { motion, AnimatePresence } from 'framer-motion';
 import { Navbar } from '../components/Navbar';
 import { Hero } from '../components/Hero';
-import { Projects } from '../components/Projects';
+import { EntryGallery } from '../components/EntryGallery';
 import { Skills } from '../components/Skills';
 import { About } from '../components/About';
 import { Contact } from '../components/Contact';
@@ -25,7 +24,7 @@ export function LandingPage() {
   const renderSection = () => {
     switch (activeSection) {
       case 'projects':
-        return <Projects />;
+        return <EntryGallery types={['project']} title="MY" accent="PROJECTS" />;
       case 'skills':
         return <Skills />;
       case 'about':
